@@ -11,16 +11,22 @@ ui <- dashboardPage(
       # Sidebar with a slider input for number of bins 
       sidebarLayout(
         sidebarPanel(
-          sliderInput("bins",
-                      "Number of bins:",
-                      min = 1,
-                      max = 50,
-                      value = 30)
+          width = 3,
+          uiOutput("UI_n_input_sets")
         ),
         
         # Show a plot of the generated distribution
         mainPanel(
-          plotOutput("distPlot")
+          width = 9,
+          tabBox(
+            title = "multi-ui UI",
+            width = "100%",
+            tabPanel(
+              title = "name and type",
+              icon = icon("calculator"),
+              uiOutput("type_ui")
+            )
+          )
         )
       )
     )
