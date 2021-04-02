@@ -14,10 +14,18 @@ ui <- dashboardPage(
           width = 3,
           uiOutput("UI_n_input_sets"),
           actionBttn(
-            inputId = "UI_save_input_sets",
-            label = "save input sets",
+            inputId = "UI_gen_input_sets",
+            label = "Generate set of default inputs",
             style = "unite",
             color = "success",
+            size = "lg",
+            block = TRUE
+          ),
+          actionBttn(
+            inputId = "UI_live_input_sets",
+            label = "Pass settings into inputs",
+            style = "unite",
+            color = "primary",
             size = "lg",
             block = TRUE
           ),

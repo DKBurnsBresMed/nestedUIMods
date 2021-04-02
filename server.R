@@ -7,6 +7,11 @@ server <- function(input, output, session) {
   #   - individual sets of inputs for each of those UIs (switches, numerics, pickers, text)
   #   - system to store changes to the inputs, even across changes to UI type
   
+
+  # default values ----------------------------------------------------------
+
+  n_ui <- 5
+  max_ui <- 50
   
   # element 1 - a simple slider -------------------------------------------
   
@@ -16,26 +21,21 @@ server <- function(input, output, session) {
       label = "Number of input sets:",
       min = 1,
       step = 1,
-      max = 50,
-      value = 5,
+      max = max_ui,
+      value = n_ui,
       ticks = F,
       post = " set(s)",
       width = "100%"
     )
   })
+  outputOptions(output,"UI_n_input_sets", suspendWhenHidden = FALSE, priority = 100)
   
-  # max_input_sets <- eventReactive(input$n_input_sets, {
-  #   
-  #   if(is.null(input$n_input_sets)) {
-  #     # return the default value when it's null
-  #     return(5)
-  #   } else {
-  #     if(isolate(input$n_input_sets)) {
-  #       
-  #     }
-  #   }
-  #   
-  # }, ignoreNULL = FALSE)
+  # tracker for the highest that n_input_sets has been during this session (observer to track it working)
+  max_uis <- reactiveValues(n = n_ui)  
+  observeEvent(input$n_input_sets,{
+    if (input$n_input_sets > max_uis$n) max_uis$n <- input$n_input_sets
+  })
+  # observe(print(reactiveValuesToList(max_uis)))
   
   # element 2: type selector -------------------------------------------
   
@@ -171,10 +171,8 @@ server <- function(input, output, session) {
 
   # ~ initiation dataset ----------------------------------------------------
 
-  # When the app boots, we want to trigger a one time event to populate a reactive
-  input_sets_default <- reactive({
-    req(!is.null(input$n_input_sets))
-    
+  # Make a set of default inputs covering types A B and C for each of the input sets
+  input_sets_default <- eventReactive(input$UI_gen_input_sets,{
     lapply(1:input$n_input_sets, function(this_input_sets) {
       
       # identify the type of input
@@ -182,32 +180,35 @@ server <- function(input, output, session) {
       this_name <- input[[paste0("UI_name_",this_input_sets)]]
       this_type <- input[[paste0("UI_type_",this_input_sets)]]
       
-      # respond by generating default dataset according to type
+      # respond by generating default dataset according to type. Generate
+      # all the types
       
       if(is.null(this_type)) {
-        udf_def_i_A(nam = NULL, n = this_input_sets)
-      } else if (this_type == "A") {
-        udf_def_i_A(nam = this_name, n = this_input_sets)
-      } else if (this_type == "B") {
-        udf_def_i_B(nam = this_name, n = this_input_sets)
+        list(
+          type = "A",
+          A = udf_def_i_A(nam = NULL, n = this_input_sets),
+          B = udf_def_i_B(nam = NULL, n = this_input_sets),
+          C = udf_def_i_C(nam = NULL, n = this_input_sets)
+        )
       } else {
-        udf_def_i_C(nam = this_name, n = this_input_sets)
-      }
+        list(
+          type = this_type,
+          A = udf_def_i_A(nam = this_name, n = this_input_sets),
+          B = udf_def_i_B(nam = this_name, n = this_input_sets),
+          C = udf_def_i_C(nam = this_name, n = this_input_sets)
+        )
+      } 
     })
   })
   
-  input_sets_default_iso <- eventReactive(input$UI_save_input_sets,{
-    isolate(input_sets_default())
-  })
+  # So, in the background we want to keep a "LIVE" version of this, such that 
+  # if the user adds or takes away sets of inputs or changes the types of individual
+  # sets of inputs
   
   
-  # debug printer
-  output$DBG_input_sets_default <- renderPrint(print(input_sets_default_iso()))
+  # debug printer for default values
+  output$DBG_input_sets_default <- renderPrint(print(input_sets_default()))
   
-  
-  
-  
-
   # UI generator modules ----------------------------------------------------
 
   
