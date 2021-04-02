@@ -12,7 +12,16 @@ ui <- dashboardPage(
       sidebarLayout(
         sidebarPanel(
           width = 3,
-          uiOutput("UI_n_input_sets")
+          uiOutput("UI_n_input_sets"),
+          actionBttn(
+            inputId = "UI_save_input_sets",
+            label = "save input sets",
+            style = "unite",
+            color = "success",
+            size = "lg",
+            block = TRUE
+          ),
+          verbatimTextOutput("DBG_input_sets_default")
         ),
         
         # Show a plot of the generated distribution

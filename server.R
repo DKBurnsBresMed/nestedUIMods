@@ -24,6 +24,18 @@ server <- function(input, output, session) {
     )
   })
   
+  # max_input_sets <- eventReactive(input$n_input_sets, {
+  #   
+  #   if(is.null(input$n_input_sets)) {
+  #     # return the default value when it's null
+  #     return(5)
+  #   } else {
+  #     if(isolate(input$n_input_sets)) {
+  #       
+  #     }
+  #   }
+  #   
+  # }, ignoreNULL = FALSE)
   
   # element 2: type selector -------------------------------------------
   
@@ -87,7 +99,111 @@ server <- function(input, output, session) {
   # Data handling -------------------------------------------
   
   # This generates all the possible datasets that could exist for all of the different
-  # UIs which could be generated
+  # UIs which could be generated. this is n_input_sets * 3 sets of inputs currently.
+  # It is therefore far more efficient to have a function to generate a default
+  # input set for A B and C type UIs
+  
+
+  # ~ Generate default input set for each type ------------------------------
+
+  # Type A: has no logicals, 4 numerics, 3 pickers, 5 text inputs
+  
+  udf_def_i_A <- function(nam, n) {
+    list(
+      name  = nam,
+      n     = n,
+      logic = list(),
+      num   = list(1,5,8,20),
+      pck   = list(
+        list(
+          selected = "option #1",
+          choices = paste0("option #",1:5)
+        ),
+        list(
+          selected = "option #1",
+          choices = paste0("option #",1:3)
+        ),
+        list(
+          selected = "option #2",
+          choices = paste0("option #",1:10)
+        )
+      ),
+      txt   = list(paste0("Type A: some text for text input #",1:5))
+    )
+  }
+  
+  # Type B: 2 switches, 2 numerics, 1 picker, 5 txt
+  
+  udf_def_i_B <- function(nam, n) {
+    list(
+      name  = nam,
+      n     = n,
+      logic = list(TRUE, FALSE),
+      num   = list(25, 50),
+      pck   = list(
+        list(
+          selected = "A",
+          choices = LETTERS
+        )
+      ),
+      txt   = list(paste0("Type B: some different text to type A, for inputs #",1:5))
+    )
+  }
+  
+  # Type B: 3 switches, 10 numerics, 1 picker, 1 txt
+  
+  udf_def_i_C <- function(nam, n) {
+    list(
+      name  = nam,
+      n     = n,
+      logic = list(TRUE, FALSE, TRUE),
+      num   = list(25, 50, 200, 85, 150, 90, 1, 0.0001, 0.25, 100),
+      pck   = list(
+        list(
+          selected = "aa",
+          choices = paste0(letters[1:3],letters[1:3])
+        )
+      ),
+      txt   = list("Type C: text input")
+    )
+  }
+  
+
+  # ~ initiation dataset ----------------------------------------------------
+
+  # When the app boots, we want to trigger a one time event to populate a reactive
+  input_sets_default <- reactive({
+    req(!is.null(input$n_input_sets))
+    
+    lapply(1:input$n_input_sets, function(this_input_sets) {
+      
+      # identify the type of input
+      
+      this_name <- input[[paste0("UI_name_",this_input_sets)]]
+      this_type <- input[[paste0("UI_type_",this_input_sets)]]
+      
+      # respond by generating default dataset according to type
+      
+      if(is.null(this_type)) {
+        udf_def_i_A(nam = NULL, n = this_input_sets)
+      } else if (this_type == "A") {
+        udf_def_i_A(nam = this_name, n = this_input_sets)
+      } else if (this_type == "B") {
+        udf_def_i_B(nam = this_name, n = this_input_sets)
+      } else {
+        udf_def_i_C(nam = this_name, n = this_input_sets)
+      }
+    })
+  })
+  
+  input_sets_default_iso <- eventReactive(input$UI_save_input_sets,{
+    isolate(input_sets_default())
+  })
+  
+  
+  # debug printer
+  output$DBG_input_sets_default <- renderPrint(print(input_sets_default_iso()))
+  
   
   
   
