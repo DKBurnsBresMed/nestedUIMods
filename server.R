@@ -35,7 +35,7 @@ server <- function(input, output, session) {
   observeEvent(input$n_input_sets,{
     if (input$n_input_sets > max_uis$n) max_uis$n <- input$n_input_sets
   })
-  # observe(print(reactiveValuesToList(max_uis)))
+  observe(print(reactiveValuesToList(max_uis)))
   
   # element 2: type selector -------------------------------------------
   
@@ -205,13 +205,313 @@ server <- function(input, output, session) {
   # if the user adds or takes away sets of inputs or changes the types of individual
   # sets of inputs
   
+
+  # ~ Module dataset inputs -------------------------------------------------------
+  
+  # The udf_def_i_A B and C functions are used to generate a default dataset
+  # in each of the A B and C modules. Inside these modules, the isolated
+  # input set is compared to the defaults - if the default set is different
+  # to the inputs inside the module, then we know that the user has changed
+  # something. This means user changes can override the default settings, which
+  # are used in the first instance to populate the inputs. It also means that 
+  # settings that have been changed can be passed back into the main server,
+  # into the reactivevalues list which then feeds through into further calculations
+  # AFTER the nested UI has finished
+
+  # so in short:
+  #   - There is a module for type A, B, C
+  #   - These modules identify whether any of the inputs in the input list 
+  #     are different to those which have been supplied in the call to the module
+  #     (i.e. whether the user has changed any of the inputs)
+  #   - The modules return only the current input set (i.e. for A, B or C type UI)
+  #     and a flag for the type
+  #   - The results from all modules from all input sets are consolidated into one
+  #     list. This list is then passed along into further model calculations
+  
+  # Example:
+  #   ui1 <- callModule(module = input_module, id = "input set 1")
+  #   
+  #   This should contain all of the ui elements and a reactive called OUT_LIST
+  #   which 
+  
+  input_module <- function(id, n, nam, type, iso_inputs) {
+    moduleServer(
+      id = id,
+      module = function(input, output, session) {
+        
+        # get namespace
+        ns <- NS(id)
+        
+        # First, generate a default input set for this 
+        if (type == "A") {
+          default_inputs <- udf_def_i_A(nam = nam,n = n)
+        } else if (type == "B") {
+          default_inputs <- udf_def_i_B(nam = nam,n = n)
+        } else {
+          default_inputs <- udf_def_i_C(nam = nam,n = n)
+        }
+        
+        # Now, if any of the isolated inputs coming from the main server are NOT the same
+        # as the default values, then these are the ones we should be passing through
+        # the module. Note that iso_inputs will be e.g. RV_iso_inputs[[1]][[RV_iso_inputs[[1]]$type]]
+        # i.e. the current type selection from the radio buttons fed into the list of all possible inputs
+        # to pull out the subset of inputs that are relevant for this set of inputs
+        
+        if (any(unlist(iso_inputs, recursive = TRUE) != unlist(default_inputs, recursive = TRUE))) {
+          
+          # so the user has changed some of the inputs for this type. We don't want to lose
+          # this information, so we should be feeding it through the UI from the point of
+          # generation
+          live_inputs <- iso_inputs
+          
+        } else {
+          live_inputs <- default_inputs
+        }
+        
+        # generate the ui elements for type A
+        
+        ## logicals (empty in type A, so no UI and empty list is all that's needed)
+        
+        logic_iso <- reactive({
+          if (length(live_inputs$logic) == 0) {
+            list()
+          } else {
+            # get the defaults
+            def <- live_inputs$logic
+            
+            lapply(1:length(def), function(this_logic) {
+              
+              this_nam <- paste0("logic_",this_logic)
+              
+              if (is.null(input[[this_nam]])) {
+                # the value is null, so output the default value (which will populate it)
+                def[[this_logic]]
+              } else {
+                # The value is not null, so isolate it so that it can be
+                # restored for later
+                isolate(input[[this_nam]])
+              }
+            })
+          }
+        })
+        
+        
+        ## numerics
+        
+        num_iso <- reactive({
+          if (length(live_inputs$num) == 0) {
+            list()
+          } else {
+            # get the defaults
+            def <- live_inputs$num
+            
+            lapply(1:length(def), function(this_num) {
+              
+              this_nam <- paste0("num_",this_num)
+              
+              if (is.null(input[[this_nam]])) {
+                # the value is null, so output the default value (which will populate it)
+                def[[this_num]]
+              } else {
+                # The value is not null, so isolate it so that it can be
+                # restored for later
+                isolate(input[[this_nam]])
+              }
+            })
+          }
+        })
+        
+        
+        ## pickers (remember this one needs options and selected)
+        
+        
+        # Note that for pickers, you need a nested list of selected and choices
+        
+        pck_iso <- reactive({
+          if (length(live_inputs$pck) == 0) {
+            list()
+          } else {
+            # get the defaults
+            def <- live_inputs$pck
+            
+            lapply(1:length(def), function(this_pck) {
+              
+              this_nam <- paste0("pck_",this_pck)
+              
+              if (is.null(input[[this_nam]])) {
+                # the value is null, so output the default value (which will populate it)
+                def[[this_pck]]
+              } else {
+                # The value is not null, so isolate it so that it can be
+                # restored for later. note that the available choices will always match default!
+                list(
+                  selected = isolate(input[[this_nam]]),
+                  choices = def[[this_pck]]$choices  
+                )
+              }
+            })
+          }
+        })
+        
+        txt_iso <- reactive({
+          if (length(live_inputs$txt) == 0) {
+            list()
+          } else {
+            # get the defaults
+            def <- live_inputs$txt
+            
+            lapply(1:length(def), function(this_txt) {
+              
+              this_nam <- paste0("txt_",this_txt)
+              
+              if (is.null(input[[this_nam]])) {
+                # the value is null, so output the default value (which will populate it)
+                def[[this_txt]]
+              } else {
+                # The value is not null, so isolate it so that it can be
+                # restored for later
+                isolate(input[[this_nam]])
+              }
+            })
+          }
+        })
+        
+        
+        # ui outputs - return a NULL if ther shouldn't be elements
+        # for this input type
+        
+        output$ui_logic <- renderUI({
+          if(length(live_inputs$logic) == 0) return(NULL)
+          lapply(1:length(live_inputs$logic), function(this_logic){
+            switchInput(
+              inputId = paste0("logic_",this_logic),
+              label = paste0("logiceric input #", this_logic, ", type A"),
+              value = logic_iso()[[this_logic]],
+              min = 0,
+              icon = icon("abacus"),
+              size = "lg",
+              width = "100%"
+            )
+          })
+        })
+        output$ui_num <- renderUI({
+          if(length(live_inputs$num) == 0) return(NULL)
+          lapply(1:length(live_inputs$num), function(this_num){
+            numericInputIcon(
+              inputId = paste0("num_",this_num),
+              label = paste0("Numeric input #", this_num, ", type A"),
+              value = num_iso()[[this_num]],
+              min = 0,
+              icon = icon("abacus"),
+              size = "lg",
+              width = "100%"
+            )
+          })
+        })
+        output$ui_pck <- renderUI({
+          if(length(live_inputs$pck) == 0) return(NULL)
+          lapply(1:length(live_inputs$pck), function(this_pck){
+            pickerInput(
+              inputId = paste0("pck_",this_pck),
+              label = paste0("pckeric input #", this_pck, ", type A"),
+              selected = pck_iso()[[this_pck]]$selected,
+              choices = pck_iso()[[this_pck]]$choices,
+              width = "100%"
+            )
+          })
+        })
+        output$ui_txt <- renderUI({
+          if(length(live_inputs$txt) == 0) return(NULL)
+          lapply(1:length(live_inputs$txt), function(this_txt){
+            textInputIcon(
+              inputId = paste0("txt_",this_txt),
+              label = paste0("text input #", this_txt, ", type A"),
+              value = txt_iso()[[this_txt]],
+              min = 0,
+              icon = icon("signature"),
+              size = "lg",
+              width = "100%"
+            )
+          })
+        })
+        
+        
+        # now that we have all the input types, we can consolidate into 
+        # a UI
+        
+        output$UI <- renderUI({
+          
+          # aesthetics etc for each type
+          if (type == "A") {
+            status <- "primary"
+          } else if (type == "B") {
+            status <- "info"
+          } else {
+            status <- "success"
+          }
+          
+          box(
+            title = paste0("input set #", n, ", type: ", type),
+            status = status,
+            solidHeader = TRUE,
+            width = "100%",
+            collapsible = TRUE,
+            collapsed = TRUE,
+            uiOutput(ui_logic),
+            uiOutput(ui_num),
+            uiOutput(ui_pck),
+            uiOutput(ui_txt)
+          )
+          
+          
+        })
+        
+        
+        # output the LIVE input set. pass along the iso reactivevalues into one list,
+        # only for this type. add in a token for type and n so we can recieve it again
+        # within the main server
+        OUT_LIST <- reactive({
+          list(
+            type = type,
+            n = n,
+            dat = list(
+              logic = logic_iso(),
+              num = num_iso(),
+              pck = pck_iso(),
+              txt = txt_iso()
+            )
+          )
+        })
+        
+        
+        # this is the return of the entire module server - a flag for type and n,
+        # and then the input set as object "dat", which can then be slotted into
+        # the appropriate place in the reactivevalues containing the full input 
+        # dataset. This means that even if the user changes the "type", the data
+        # they entered for the other type possibilities for that input set
+        # won't be lost
+        return(OUT_LIST)
+        
+        
+        # OUT_LIST is then injected into a reactivevalues object inside the main server
+        # which contains all of the possible input sets for all possible inputs
+        
+      }
+    )
+  }
+  
   
   # debug printer for default values
   output$DBG_input_sets_default <- renderPrint(print(input_sets_default()))
   
   # UI generator modules ----------------------------------------------------
 
-  
+  getOutputsFromModule <- function(id) {
+    ns<-NS(id)
+    tagList(
+      uiOutput(outputId = ns("UI"))
+    )
+  }
   
   
 }
