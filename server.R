@@ -35,7 +35,7 @@ server <- function(input, output, session) {
   observeEvent(input$n_input_sets,{
     if (input$n_input_sets > max_uis$n) max_uis$n <- input$n_input_sets
   })
-  observe(print(reactiveValuesToList(max_uis)))
+  # observe(print(reactiveValuesToList(max_uis)))
   
   # element 2: type selector -------------------------------------------
   
@@ -45,7 +45,7 @@ server <- function(input, output, session) {
       textInputIcon(
         inputId = paste0("UI_name_",this_ui),
         label = NULL,
-        value = NULL, 
+        value = RV_nam_type_iso$dat[[this_ui]]$name, 
         placeholder = paste0("Insert name for UI #",this_ui),
         icon = icon("signature"),
         size = "sm",
@@ -65,7 +65,7 @@ server <- function(input, output, session) {
         label = NULL,
         status = "primary",
         choices = LETTERS[1:3],
-        selected = "A",
+        selected = RV_nam_type_iso$dat[[this_ui]]$type,
         inline = TRUE,
         width = "100%",
         shape = "square"
@@ -87,13 +87,90 @@ server <- function(input, output, session) {
     
     req(!is.null(input$n_input_sets))
     
+    RV <- reactiveValuesToList(RV_nam_type_iso)
+    
     udf_gen_type_ui(
       n_input_sets = input$n_input_sets,
-      nam_iso = NULL,
-      selec_iso = NULL
+      nam_iso = map(RV, ~ .x$name),
+      selec_iso = map(RV, ~ .x$type)
     )
     
   })
+  
+  
+  # isolator for name and type inputs. Create a starting poing for all types
+  # for the default (5) inputs. 
+  
+  RV_nam_type_iso <- reactiveValues(dat = lapply(1:n_ui, function(this_set) {
+    list(
+      A = udf_def_i_A(nam = NULL, n = this_set),
+      B = udf_def_i_B(nam = NULL, n = this_set),
+      C = udf_def_i_C(nam = NULL, n = this_set)
+    )
+  }))
+  
+  observeEvent({
+    input$n_input_sets
+    lapply(1:max_uis$n, function(this_set) {
+      input[[paste0("UI_name_",this_set)]]
+    })
+    lapply(1:max_uis$n, function(this_set) {
+      input[[paste0("UI_type_",this_set)]]
+    })
+  },{
+    
+    req(!is.null(input$n_input_sets))
+    
+    # basically, if the max ever input set in the lapply is lower or equal to
+    # the current input set, isolate the name input and put it into the 
+    # reactivevalues list containing the final input set. do the same for type 
+    # 
+    # This can then be passed into the name and type input set such that it gets
+    # populated with the previous values if someone changes the number of UIs to
+    # generate
+    
+    len_current_iso <- length(RV_nam_type_iso$dat)
+    
+    if (length(max_uis$n > 0)) {
+      lapply(1:max_uis$n, function(this_nam) {
+        if (this_nam <= len_current_iso) {
+          RV_nam_type_iso$dat[[this_nam]]$name <- input[[paste0("UI_name_",this_nam)]]
+          RV_nam_type_iso$dat[[this_nam]]$type <- isolate(input[[paste0("UI_type_",this_nam)]])
+        }
+      })
+    }
+    
+  },ignoreInit = TRUE, ignoreNULL = TRUE)
+  
+  # If a new set is being made (i.e. if the max n goes up), then generate
+  # the default datasets for it and put them into the RV
+  observeEvent(max_uis$n,{
+    
+    # so, there is a / are some new ui(s) to generate and populate, generate default values 
+    # and make it/them type A with no name
+    
+    # so, find out the number of UIs to generate, i.e. the difference between the current list
+    # of input sets, and the new value of max_uis$n
+    
+    current_list_length <- length(RV_nam_type_iso$dat)
+    
+    how_many_uis <- max_uis$n - current_list_length
+    
+    # now generate the new sets
+    
+    new_sets <- lapply(1:how_many_uis, function(this_set) {
+      list(
+        A = udf_def_i_A(nam = NULL, n = this_set + current_list_length),
+        B = udf_def_i_B(nam = NULL, n = this_set + current_list_length),
+        C = udf_def_i_C(nam = NULL, n = this_set + current_list_length)
+      )
+    })
+    
+    # now append the new list objects onto the end of the RVs!
+    RV_nam_type_iso$dat <- c(RV_nam_type_iso$dat, new_sets)
+    
+  },ignoreNULL = TRUE)
+  
   
   
   # Data handling -------------------------------------------
@@ -103,71 +180,7 @@ server <- function(input, output, session) {
   # It is therefore far more efficient to have a function to generate a default
   # input set for A B and C type UIs
   
-
-  # ~ Generate default input set for each type ------------------------------
-
-  # Type A: has no logicals, 4 numerics, 3 pickers, 5 text inputs
-  
-  udf_def_i_A <- function(nam, n) {
-    list(
-      name  = nam,
-      n     = n,
-      logic = list(),
-      num   = list(1,5,8,20),
-      pck   = list(
-        list(
-          selected = "option #1",
-          choices = paste0("option #",1:5)
-        ),
-        list(
-          selected = "option #1",
-          choices = paste0("option #",1:3)
-        ),
-        list(
-          selected = "option #2",
-          choices = paste0("option #",1:10)
-        )
-      ),
-      txt   = list(paste0("Type A: some text for text input #",1:5))
-    )
-  }
-  
-  # Type B: 2 switches, 2 numerics, 1 picker, 5 txt
-  
-  udf_def_i_B <- function(nam, n) {
-    list(
-      name  = nam,
-      n     = n,
-      logic = list(TRUE, FALSE),
-      num   = list(25, 50),
-      pck   = list(
-        list(
-          selected = "A",
-          choices = LETTERS
-        )
-      ),
-      txt   = list(paste0("Type B: some different text to type A, for inputs #",1:5))
-    )
-  }
-  
-  # Type B: 3 switches, 10 numerics, 1 picker, 1 txt
-  
-  udf_def_i_C <- function(nam, n) {
-    list(
-      name  = nam,
-      n     = n,
-      logic = list(TRUE, FALSE, TRUE),
-      num   = list(25, 50, 200, 85, 150, 90, 1, 0.0001, 0.25, 100),
-      pck   = list(
-        list(
-          selected = "aa",
-          choices = paste0(letters[1:3],letters[1:3])
-        )
-      ),
-      txt   = list("Type C: text input")
-    )
-  }
-  
+  # see global.R for function definitions
 
   # ~ initiation dataset ----------------------------------------------------
 
@@ -476,10 +489,11 @@ server <- function(input, output, session) {
             n = n,
             dat = list(
               logic = logic_iso(),
-              num = num_iso(),
-              pck = pck_iso(),
-              txt = txt_iso()
-            )
+              num   = num_iso(),
+              pck   = pck_iso(),
+              txt   = txt_iso()
+            ),
+            ui = tagList(uiOutput(ns("UI")))
           )
         })
         
@@ -502,16 +516,18 @@ server <- function(input, output, session) {
   
   
   # debug printer for default values
-  output$DBG_input_sets_default <- renderPrint(print(input_sets_default()))
+  output$DBG_input_sets_default <- renderPrint(print(RV_nam_type_iso$dat))
   
   # UI generator modules ----------------------------------------------------
 
   getOutputsFromModule <- function(id) {
     ns<-NS(id)
-    tagList(
-      uiOutput(outputId = ns("UI"))
-    )
+    
   }
+  
+  
+  
+  
   
   
 }
