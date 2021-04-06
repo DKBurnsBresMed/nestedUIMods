@@ -42,10 +42,17 @@ server <- function(input, output, session) {
   udf_gen_type_ui <- function(n_input_sets, nam_iso = NULL, selec_iso = NULL) {
 
     nam_elems <- lapply(1:n_input_sets, function(this_ui) {
+      
+      if (this_ui <= length(RV_nam_type_iso$dat)) {
+        val <- RV_nam_type_iso$dat[[this_ui]]$name
+      } else {
+        val <- ""
+      }
+      
       textInputIcon(
         inputId = paste0("UI_name_",this_ui),
         label = NULL,
-        value = RV_nam_type_iso$dat[[this_ui]]$name, 
+        value = val, 
         placeholder = paste0("Insert name for UI #",this_ui),
         icon = icon("signature"),
         size = "sm",
@@ -60,12 +67,21 @@ server <- function(input, output, session) {
     }
     
     type_elems <- lapply(1:n_input_sets, function(this_ui) {
+      
+      # if it's blank put an A, if not put what's in the isolation loop
+      if (this_ui <= length(RV_nam_type_iso$dat)) {
+        val <- RV_nam_type_iso$dat[[this_ui]]$type
+      } else {
+        val <- "A"
+      }
+      
+      
       prettyRadioButtons(
         inputId = paste0("UI_type_",this_ui),
         label = NULL,
         status = "primary",
         choices = LETTERS[1:3],
-        selected = RV_nam_type_iso$dat[[this_ui]]$type,
+        selected = val,
         inline = TRUE,
         width = "100%",
         shape = "square"
